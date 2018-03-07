@@ -1,9 +1,9 @@
 //  Copyright (c) 2015 Rob Rix. All rights reserved.
 
 /// An enum representing either a failure with an explanatory error, or a success with a result value.
-public enum Result<Value, Error: Swift.Error>: ResultProtocol, CustomStringConvertible, CustomDebugStringConvertible {
+public enum Result<Value>: ResultProtocol, CustomStringConvertible, CustomDebugStringConvertible {
 	case success(Value)
-	case failure(Error)
+	case failure(Swift.Error)
 
 	// MARK: Constructors
 
@@ -13,12 +13,12 @@ public enum Result<Value, Error: Swift.Error>: ResultProtocol, CustomStringConve
 	}
 
 	/// Constructs a failure wrapping an `error`.
-	public init(error: Error) {
+	public init(error: Swift.Error) {
 		self = .failure(error)
 	}
 
 	/// Constructs a result from an `Optional`, failing with `Error` if `nil`.
-	public init(_ value: Value?, failWith: @autoclosure () -> Error) {
+	public init(_ value: Value?, failWith: @autoclosure () -> Swift.Error) {
 		self = value.map(Result.success) ?? .failure(failWith())
 	}
 
@@ -31,11 +31,8 @@ public enum Result<Value, Error: Swift.Error>: ResultProtocol, CustomStringConve
 	public init(attempt f: () throws -> Value) {
 		do {
 			self = .success(try f())
-		} catch var error {
-			if Error.self == AnyError.self {
-				error = AnyError(error)
-			}
-			self = .failure(error as! Error)
+		} catch let error {
+			self = .failure(error)
 		}
 	}
 
@@ -110,84 +107,14 @@ public enum Result<Value, Error: Swift.Error>: ResultProtocol, CustomStringConve
 	}
 
 	// MARK: ResultProtocol
-	public var result: Result<Value, Error> {
+	public var result: Result<Value> {
 		return self
 	}
 }
 
-extension Result where Error == AnyError {
-	/// Constructs a result from an expression that uses `throw`, failing with `AnyError` if throws.
-	public init(_ f: @autoclosure () throws -> Value) {
-		self.init(attempt: f)
-	}
-
-	/// Constructs a result from a closure that uses `throw`, failing with `AnyError` if throws.
-	public init(attempt f: () throws -> Value) {
-		do {
-			self = .success(try f())
-		} catch {
-			self = .failure(AnyError(error))
-		}
-	}
-}
-
-// MARK: - Derive result from failable closure
-
-@available(*, deprecated, renamed: "Result.init(attempt:)")
-public func materialize<T>(_ f: () throws -> T) -> Result<T, AnyError> {
-	return Result(attempt: f)
-}
-
-@available(*, deprecated, renamed: "Result.init(_:)")
-public func materialize<T>(_ f: @autoclosure () throws -> T) -> Result<T, AnyError> {
-	return Result(f)
-}
-
-// MARK: - ErrorConvertible conformance
-	
-extension NSError: ErrorConvertible {
-	public static func error(from error: Swift.Error) -> Self {
-		func cast<T: NSError>(_ error: Swift.Error) -> T {
-			return error as! T
-		}
-
-		return cast(error)
-	}
-}
-
-// MARK: - migration support
-
-@available(*, unavailable, message: "Use the overload which returns `Result<T, AnyError>` instead")
-public func materialize<T>(_ f: () throws -> T) -> Result<T, NSError> {
-	fatalError()
-}
-
-@available(*, unavailable, message: "Use the overload which returns `Result<T, AnyError>` instead")
-public func materialize<T>(_ f: @autoclosure () throws -> T) -> Result<T, NSError> {
-	fatalError()
-}
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 
-/// Constructs a `Result` with the result of calling `try` with an error pointer.
-///
-/// This is convenient for wrapping Cocoa API which returns an object or `nil` + an error, by reference. e.g.:
-///
-///     Result.try { NSData(contentsOfURL: URL, options: .dataReadingMapped, error: $0) }
-@available(*, unavailable, message: "This has been removed. Use `Result.init(attempt:)` instead. See https://github.com/antitypical/Result/issues/85 for the details.")
-public func `try`<T>(_ function: String = #function, file: String = #file, line: Int = #line, `try`: (NSErrorPointer) -> T?) -> Result<T, NSError> {
-	fatalError()
-}
-
-/// Constructs a `Result` with the result of calling `try` with an error pointer.
-///
-/// This is convenient for wrapping Cocoa API which returns a `Bool` + an error, by reference. e.g.:
-///
-///     Result.try { NSFileManager.defaultManager().removeItemAtURL(URL, error: $0) }
-@available(*, unavailable, message: "This has been removed. Use `Result.init(attempt:)` instead. See https://github.com/antitypical/Result/issues/85 for the details.")
-public func `try`(_ function: String = #function, file: String = #file, line: Int = #line, `try`: (NSErrorPointer) -> Bool) -> Result<(), NSError> {
-	fatalError()
-}
 
 #endif
 
